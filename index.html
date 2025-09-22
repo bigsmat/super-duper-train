@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title></title>
+  <style>
+    html, body { height: 100%; margin: 0; background: #000; }
+    .wrap { height: 100%; display: flex; align-items: center; justify-content: center; }
+    /* tiny heartbeat dot so the page isn't literally blank */
+    .dot { position: fixed; top: 12px; right: 12px; width: 6px; height: 6px; border-radius: 50%; background: #111; box-shadow: 0 0 12px #222; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div id="captcha"></div>
+  </div>
+  <div class="dot" aria-hidden="true"></div>
+
+  <script>
+    // Auto-looping hCaptcha using the official test sitekey.
+    // On solve: wait a moment so the checkmark flashes, then reset.
+    function initCaptcha() {
+      try {
+        window.__captchaWidget = hcaptcha.render('captcha', {
+          sitekey: '10000000-ffff-ffff-ffff-000000000001', // hCaptcha public test key
+          theme: 'dark',
+          callback: function () {
+            setTimeout(function () {
+              try { hcaptcha.reset(window.__captchaWidget); } catch (e) {}
+            }, 500);
+          }
+        });
+      } catch (e) {
+        // If the script isn't ready yet, retry shortly.
+        setTimeout(initCaptcha, 250);
+      }
+    }
+    window.initCaptcha = initCaptcha;
+  </script>
+  <script src="https://hcaptcha.com/1/api.js?onload=initCaptcha&render=explicit" async defer></script>
+</body>
+</html>
