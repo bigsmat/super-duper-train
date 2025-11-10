@@ -1,43 +1,767 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title></title>
+  <meta charset="UTF-8" />
+  <title>Watching Paint Dry: The Game</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
-    html, body { height: 100%; margin: 0; background: #000; }
-    .wrap { height: 100%; display: flex; align-items: center; justify-content: center; }
-    /* tiny heartbeat dot so the page isn't literally blank */
-    .dot { position: fixed; top: 12px; right: 12px; width: 6px; height: 6px; border-radius: 50%; background: #111; box-shadow: 0 0 12px #222; }
+    * {
+      box-sizing: border-box;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #111827;
+      color: #e5e7eb;
+    }
+
+    .app {
+      background: #020617;
+      border-radius: 18px;
+      padding: 24px 24px 18px;
+      max-width: 900px;
+      width: 100%;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.8);
+      border: 1px solid #1f2937;
+    }
+
+    h1 {
+      margin: 0 0 4px;
+      font-size: 1.6rem;
+    }
+
+    .subtitle {
+      margin: 0 0 16px;
+      font-size: 0.85rem;
+      color: #9ca3af;
+    }
+
+    .paint-wall {
+      position: relative;
+      border-radius: 14px;
+      height: 65vh;
+      max-height: 600px;
+      overflow: hidden;
+      margin-bottom: 16px;
+      background: #111827;
+      border: 1px solid #1f2937;
+    }
+
+    .paint-layer {
+      position: absolute;
+      inset: 0;
+      transition: filter 0.25s linear, background 0.25s linear, opacity 0.25s linear;
+    }
+
+    .paint-overlay {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 20% 0%, rgba(255, 255, 255, 0.18), transparent 55%),
+                  radial-gradient(circle at 80% 100%, rgba(0, 0, 0, 0.4), transparent 55%);
+      mix-blend-mode: soft-light;
+      opacity: 0.8;
+      pointer-events: none;
+    }
+
+    .grain {
+      position: absolute;
+      inset: -40px;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 160 160' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='4' stitchTiles='noStitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.16'/%3E%3C/svg%3E");
+      mix-blend-mode: soft-light;
+      opacity: 0.6;
+      pointer-events: none;
+    }
+
+    .status-line {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      margin-bottom: 6px;
+      gap: 8px;
+    }
+
+    .status-pill {
+      padding: 3px 9px;
+      border-radius: 999px;
+      border: 1px solid #1f2937;
+      background: #020617;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: #f97316;
+      box-shadow: 0 0 0 4px rgba(248, 113, 113, 0.18);
+    }
+
+    .status-dot.done {
+      background: #22c55e;
+      box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.2);
+    }
+
+    .status-text {
+      color: #e5e7eb;
+    }
+
+    .controls-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 14px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .field-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.8rem;
+      color: #9ca3af;
+      flex-wrap: wrap;
+    }
+
+    select {
+      background: #020617;
+      color: #e5e7eb;
+      border-radius: 999px;
+      border: 1px solid #374151;
+      padding: 4px 10px;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+
+    .swatch-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      max-width: 260px;
+    }
+
+    .swatch {
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      border: 1px solid #111827;
+      outline: 1px solid transparent;
+      outline-offset: 1px;
+    }
+
+    .swatch.active {
+      outline-color: #facc15;
+    }
+
+    button {
+      border-radius: 999px;
+      border: none;
+      padding: 7px 14px;
+      font-size: 0.8rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      background: #4f46e5;
+      color: white;
+      box-shadow: 0 10px 30px rgba(79, 70, 229, 0.45);
+      transition: transform 0.1s ease, box-shadow 0.1s ease, background 0.1s ease;
+      white-space: nowrap;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 16px 40px rgba(79, 70, 229, 0.6);
+      background: #6366f1;
+    }
+
+    button:active {
+      transform: translateY(0);
+      box-shadow: 0 6px 18px rgba(79, 70, 229, 0.5);
+    }
+
+    button.secondary {
+      background: transparent;
+      color: #9ca3af;
+      box-shadow: none;
+      border: 1px solid #374151;
+    }
+
+    button.secondary:hover {
+      background: #020617;
+      box-shadow: none;
+    }
+
+    .progress-shell {
+      background: #020617;
+      border-radius: 999px;
+      border: 1px solid #1f2937;
+      padding: 3px;
+      margin-bottom: 6px;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      height: 10px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #22c55e, #a3e635);
+      transform-origin: left center;
+      transform: scaleX(0);
+      transition: transform 0.15s linear;
+    }
+
+    .progress-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      color: #9ca3af;
+      margin-bottom: 10px;
+      gap: 8px;
+    }
+
+    .footer-note {
+      font-size: 0.72rem;
+      color: #6b7280;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .tiny-pill {
+      border-radius: 999px;
+      border: 1px solid #374151;
+      padding: 2px 8px;
+    }
+
+    .timer-badge {
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    @media (max-width: 520px) {
+      .app {
+        border-radius: 0;
+        min-height: 100vh;
+        max-width: 100%;
+      }
+
+      .paint-wall {
+        height: 60vh;
+      }
+    }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div id="captcha"></div>
+  <div class="app">
+    <h1>Watching Paint Dry</h1>
+    <p class="subtitle">Pick a color and paint type, then let real-time drying do its thing. Progress (and dryness) continues even while this page is closed.</p>
+
+    <div class="paint-wall">
+      <div class="paint-layer" id="paintLayer"></div>
+      <div class="paint-overlay"></div>
+      <div class="grain"></div>
+    </div>
+
+    <div class="status-line">
+      <div class="status-pill" id="statusPill">
+        <span class="status-dot" id="statusDot"></span>
+        <span class="status-text" id="statusText">Idle • no paint yet</span>
+      </div>
+      <span class="timer-badge" id="timerBadge">00:00 / 01:00</span>
+    </div>
+
+    <div class="progress-shell">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+    <div class="progress-meta">
+      <span id="progressLabel">0% dry</span>
+      <span id="hintLabel">Choose a color and paint type, then hit "Start drying".</span>
+    </div>
+
+    <div class="controls-row">
+      <div class="field-group">
+        <span>Paint color</span>
+        <div class="swatch-row" id="swatchRow"></div>
+      </div>
+      <div class="field-group">
+        <span>Paint type</span>
+        <select id="paintType">
+          <option value="latex">Latex (water-based)</option>
+          <option value="acrylic">Acrylic</option>
+          <option value="oil">Oil-based</option>
+          <option value="enamel">Enamel</option>
+          <option value="shellac">Shellac</option>
+          <option value="alkyd">Alkyd</option>
+          <option value="chalk">Chalk paint</option>
+          <option value="milk">Milk paint</option>
+          <option value="lead">Lead-based</option>
+        </select>
+      </div>
+
+      <div style="display:flex; gap:6px; margin-left:auto;">
+        <button id="startBtn" type="button">
+          <span id="startBtnLabel">Start drying</span>
+        </button>
+        <button id="resetBtn" type="button" class="secondary">Reset</button>
+      </div>
+    </div>
+
+    <div class="footer-note">
+      <span>Progress is stored locally with localStorage and uses real time (even while closed).</span>
+      <span class="tiny-pill">Tip: pick oil or lead if you really want to commit.</span>
+    </div>
   </div>
-  <div class="dot" aria-hidden="true"></div>
 
   <script>
-    // Auto-looping hCaptcha using the official test sitekey.
-    // On solve: wait a moment so the checkmark flashes, then reset.
-    function initCaptcha() {
-      try {
-        window.__captchaWidget = hcaptcha.render('captcha', {
-          sitekey: '10000000-ffff-ffff-ffff-000000000001', // hCaptcha public test key
-          theme: 'dark',
-          callback: function () {
-            setTimeout(function () {
-              try { hcaptcha.reset(window.__captchaWidget); } catch (e) {}
-            }, 500);
-          }
-        });
-      } catch (e) {
-        // If the script isn't ready yet, retry shortly.
-        setTimeout(initCaptcha, 250);
+    (function () {
+      const STORAGE_KEY = "watching-paint-dry-save-v2";
+
+      const paintLayer = document.getElementById("paintLayer");
+      const statusDot = document.getElementById("statusDot");
+      const statusText = document.getElementById("statusText");
+      const progressBar = document.getElementById("progressBar");
+      const progressLabel = document.getElementById("progressLabel");
+      const hintLabel = document.getElementById("hintLabel");
+      const paintTypeSelect = document.getElementById("paintType");
+      const startBtn = document.getElementById("startBtn");
+      const startBtnLabel = document.getElementById("startBtnLabel");
+      const resetBtn = document.getElementById("resetBtn");
+      const timerBadge = document.getElementById("timerBadge");
+      const statusPill = document.getElementById("statusPill");
+      const swatchRow = document.getElementById("swatchRow");
+
+      const COLORS = [
+        { name: "Extra White", hex: "#F3F4F6" },
+        { name: "Alabaster", hex: "#EDE6D9" },
+        { name: "Accessible Beige", hex: "#D2C2A8" },
+        { name: "Agreeable Gray", hex: "#D1CBC4" },
+        { name: "Repose Gray", hex: "#CCC9C2" },
+        { name: "Concrete", hex: "#9CA3AF" },
+        { name: "Steel Gray", hex: "#4B5563" },
+        { name: "Charcoal", hex: "#111827" },
+        { name: "Sky Blue", hex: "#60A5FA" },
+        { name: "Navy", hex: "#1F3A56" },
+        { name: "Teal", hex: "#0D9488" },
+        { name: "Forest Green", hex: "#15803D" },
+        { name: "Lime", hex: "#65A30D" },
+        { name: "Fire Red", hex: "#DC2626" },
+        { name: "Soft Pink", hex: "#FB7185" },
+        { name: "Royal Purple", hex: "#8B5CF6" },
+        { name: "Sunset Orange", hex: "#F97316" },
+        { name: "Golden Yellow", hex: "#FACC15" },
+        { name: "Eggshell", hex: "#F9F4E8" },
+        { name: "Warm Sand", hex: "#E4C9A1" }
+      ];
+
+      // Approximate real-world drying durations (touch-dry / visibly dry) in seconds
+      const PAINT_TYPES = {
+        latex: { label: "Latex (water-based)", duration: 60 * 60 },           // ~1 hour
+        acrylic: { label: "Acrylic", duration: 45 * 60 },                     // ~45 minutes
+        oil: { label: "Oil-based", duration: 12 * 60 * 60 },                  // ~12 hours
+        enamel: { label: "Enamel", duration: 8 * 60 * 60 },                   // ~8 hours
+        shellac: { label: "Shellac", duration: 30 * 60 },                     // ~30 minutes
+        alkyd: { label: "Alkyd", duration: 6 * 60 * 60 },                     // ~6 hours
+        chalk: { label: "Chalk paint", duration: 60 * 60 },                   // ~1 hour
+        milk: { label: "Milk paint", duration: 4 * 60 * 60 },                 // ~4 hours
+        lead: { label: "Lead-based", duration: 24 * 60 * 60 }                 // ~24 hours
+      };
+
+      let state = {
+        color: "#3b82f6",
+        paintType: "latex",
+        startTime: null,
+        duration: PAINT_TYPES.latex.duration,
+        completed: false
+      };
+
+      function getPaintTypeDef() {
+        return PAINT_TYPES[state.paintType] || PAINT_TYPES.latex;
       }
-    }
-    window.initCaptcha = initCaptcha;
+
+      let tickHandle = null;
+
+      function supportsLocalStorage() {
+        try {
+          const testKey = "__ls_test";
+          window.localStorage.setItem(testKey, "1");
+          window.localStorage.removeItem(testKey);
+          return true;
+        } catch (e) {
+          return false;
+        }
+      }
+
+      const HAS_STORAGE = supportsLocalStorage();
+
+      function saveState() {
+        if (!HAS_STORAGE) return;
+        try {
+          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        } catch (e) {
+          // ignore
+        }
+      }
+
+      function loadState() {
+        if (!HAS_STORAGE) return;
+        try {
+          const raw = window.localStorage.getItem(STORAGE_KEY);
+          if (!raw) return;
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === "object") {
+            state = Object.assign({}, state, parsed);
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+
+      function clearState() {
+        if (!HAS_STORAGE) return;
+        try {
+          window.localStorage.removeItem(STORAGE_KEY);
+        } catch (e) {
+          // ignore
+        }
+      }
+
+      // Flexible time formatter
+      function formatTime(seconds) {
+        const s = Math.max(0, Math.floor(seconds));
+        const pad = (n) => String(n).padStart(2, "0");
+        const daySeconds = 24 * 60 * 60;
+
+        if (s < 60 * 60) {
+          // under 1 hour -> MM:SS
+          const m = Math.floor(s / 60);
+          const r = s % 60;
+          return `${pad(m)}:${pad(r)}`;
+        } else if (s < daySeconds) {
+          // under 1 day -> HH:MM:SS
+          const h = Math.floor(s / 3600);
+          const rem = s % 3600;
+          const m = Math.floor(rem / 60);
+          const r = rem % 60;
+          return `${pad(h)}:${pad(m)}:${pad(r)}`;
+        } else {
+          // 1 day or more -> DD:HH:MM:SS
+          const d = Math.floor(s / daySeconds);
+          const remDay = s % daySeconds;
+          const h = Math.floor(remDay / 3600);
+          const rem = remDay % 3600;
+          const m = Math.floor(rem / 60);
+          const r = rem % 60;
+          return `${pad(d)}:${pad(h)}:${pad(m)}:${pad(r)}`;
+        }
+      }
+
+      function hexToHsl(hex) {
+        let h = 0, s = 0, l = 0;
+        if (!hex) {
+          return { h: 0, s: 0, l: 0.5 };
+        }
+        let c = hex.replace("#", "");
+        if (c.length === 3) {
+          c = c.split("").map(ch => ch + ch).join("");
+        }
+        const num = parseInt(c, 16);
+        const r = ((num >> 16) & 255) / 255;
+        const g = ((num >> 8) & 255) / 255;
+        const b = (num & 255) / 255;
+        const max = Math.max(r, g, b);
+        const min = Math.min(r, g, b);
+        l = (max + min) / 2;
+        if (max === min) {
+          h = 0;
+          s = 0;
+        } else {
+          const d = max - min;
+          s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+          switch (max) {
+            case r:
+              h = (g - b) / d + (g < b ? 6 : 0);
+              break;
+            case g:
+              h = (b - r) / d + 2;
+              break;
+            case b:
+              h = (r - g) / d + 4;
+              break;
+          }
+          h *= 60;
+        }
+        return { h, s, l };
+      }
+
+      function hslToCss(h, s, l) {
+        const hh = (h % 360 + 360) % 360;
+        const ss = Math.max(0, Math.min(1, s));
+        const ll = Math.max(0, Math.min(1, l));
+        return `hsl(${Math.round(hh)}, ${Math.round(ss * 100)}%, ${Math.round(ll * 100)}%)`;
+      }
+
+      function lerp(a, b, t) {
+        return a + (b - a) * t;
+      }
+
+      function lerpHue(h1, h2, t) {
+        let delta = ((h2 - h1 + 540) % 360) - 180;
+        return (h1 + delta * t + 360) % 360;
+      }
+
+      function applyColor(progress) {
+        const baseHex = state.color || "#3b82f6";
+        const base = hexToHsl(baseHex);
+        const typeId = state.paintType || "latex";
+
+        let wet, dry;
+
+        // Define wet vs dry appearance per paint type
+        switch (typeId) {
+          case "acrylic":
+          case "latex": {
+            // Water-based: dries slightly lighter and a bit less saturated
+            wet = { h: base.h, s: Math.min(1, base.s * 1.05), l: base.l * 0.85 };
+            dry = { h: base.h, s: base.s * 0.9, l: Math.min(base.l * 1.08, 0.97) };
+            break;
+          }
+          case "oil": {
+            // Oil: looks richer and a touch darker when dry
+            wet = { h: base.h, s: Math.min(1, base.s * 1.1), l: Math.min(base.l * 1.05, 0.9) };
+            dry = { h: base.h, s: base.s, l: base.l * 0.8 };
+            break;
+          }
+          case "enamel": {
+            // Enamel: glossy but color shift is small
+            wet = { h: base.h, s: Math.min(1, base.s * 1.05), l: base.l * 0.9 };
+            dry = { h: base.h, s: base.s * 0.95, l: base.l };
+            break;
+          }
+          case "shellac": {
+            // Shellac: tends to look warmer and more transparent as it dries
+            wet = { h: base.h, s: base.s, l: base.l * 0.75 };
+            dry = { h: base.h + 5, s: base.s * 0.7, l: Math.min(base.l * 1.25, 0.98) };
+            break;
+          }
+          case "alkyd": {
+            // Alkyd: similar to enamel but slightly more dark when dry
+            wet = { h: base.h, s: base.s * 1.05, l: base.l * 0.9 };
+            dry = { h: base.h, s: base.s * 0.92, l: base.l * 0.88 };
+            break;
+          }
+          case "chalk": {
+            // Chalk paint: dries much more matte and lighter
+            wet = { h: base.h, s: base.s * 0.9, l: base.l * 0.9 };
+            dry = { h: base.h, s: base.s * 0.4, l: Math.min(base.l * 1.18, 0.97) };
+            break;
+          }
+          case "milk": {
+            // Milk paint: soft, a bit chalky when dry
+            wet = { h: base.h, s: base.s * 0.95, l: base.l * 0.85 };
+            dry = { h: base.h, s: base.s * 0.6, l: Math.min(base.l * 1.12, 0.96) };
+            break;
+          }
+          case "lead": {
+            // Old lead paint: can yellow and darken slightly with age
+            wet = { h: base.h, s: base.s * 1.05, l: base.l * 0.9 };
+            dry = { h: base.h + 10, s: base.s * 0.9, l: base.l * 0.78 };
+            break;
+          }
+          default: {
+            wet = { h: base.h, s: base.s, l: base.l };
+            dry = { h: base.h, s: base.s, l: base.l };
+          }
+        }
+
+        const t = Math.max(0, Math.min(1, progress));
+        const h = lerpHue(wet.h, dry.h, t);
+        const s = lerp(wet.s, dry.s, t);
+        const l = lerp(wet.l, dry.l, t);
+
+        paintLayer.style.background = hslToCss(h, s, l);
+      }
+
+      function computeProgress() {
+        if (!state.startTime) return 0;
+        const now = Date.now();
+        const elapsedSecs = (now - state.startTime) / 1000;
+        const total = state.duration || getPaintTypeDef().duration;
+        return Math.min(1, elapsedSecs / total);
+      }
+
+      function updateUI() {
+        const typeDef = getPaintTypeDef();
+        state.duration = typeDef.duration;
+
+        const progress = computeProgress();
+        const percent = Math.round(progress * 100);
+
+        applyColor(progress);
+
+        // Glossiness / blur: wet = glossy + blurred highlight, dry = matte
+        const glossiness = 1 - progress;
+        const blur = glossiness * 1.5;
+        const sat = 1 + glossiness * 0.7;
+        paintLayer.style.filter = `saturate(${sat}) blur(${blur}px)`;
+
+        progressBar.style.transform = `scaleX(${progress})`;
+        progressLabel.textContent = `${percent}% dry`;
+
+        const total = state.duration;
+        const elapsedRaw = state.startTime ? (Date.now() - state.startTime) / 1000 : 0;
+        const elapsedDisplay = Math.min(elapsedRaw, total);
+        timerBadge.textContent = `${formatTime(elapsedDisplay)} / ${formatTime(total)}`;
+
+        if (!state.startTime) {
+          statusText.textContent = "Idle • no paint yet";
+          hintLabel.textContent = "Choose a color and paint type, then hit \"Start drying\".";
+          statusDot.classList.remove("done");
+          statusPill.style.borderColor = "#1f2937";
+          startBtnLabel.textContent = "Start drying";
+          return;
+        }
+
+        if (progress >= 1 || state.completed) {
+          state.completed = true;
+          statusText.textContent = `${typeDef.label} • fully dry`;
+          hintLabel.textContent = "This coat is done. You can start a new one any time.";
+          statusDot.classList.add("done");
+          statusPill.style.borderColor = "#16a34a";
+          startBtnLabel.textContent = "New coat";
+        } else {
+          statusText.textContent = `${typeDef.label} • drying (${percent}%)`;
+          hintLabel.textContent = "You can close this window; drying continues using real time.";
+          statusDot.classList.remove("done");
+          statusPill.style.borderColor = "#1f2937";
+          startBtnLabel.textContent = "Nudge drying";
+        }
+      }
+
+      function stopTimerInterval() {
+        if (tickHandle) {
+          window.clearInterval(tickHandle);
+          tickHandle = null;
+        }
+      }
+
+      function startTimer(resetIfDone) {
+        const typeDef = getPaintTypeDef();
+        state.duration = typeDef.duration;
+        if (!state.startTime || resetIfDone) {
+          state.startTime = Date.now();
+          state.completed = false;
+        }
+        saveState();
+        stopTimerInterval();
+        tickHandle = window.setInterval(function () {
+          const progress = computeProgress();
+          updateUI();
+          if (progress >= 1 && !state.completed) {
+            state.completed = true;
+            saveState();
+            stopTimerInterval(); // stop counting once dry
+          }
+        }, 200);
+        updateUI();
+      }
+
+      function resetAll() {
+        const prevType = state.paintType || "latex";
+        const typeDef = PAINT_TYPES[prevType] || PAINT_TYPES.latex;
+        state = {
+          color: "#3b82f6",
+          paintType: prevType,
+          startTime: null,
+          duration: typeDef.duration,
+          completed: false
+        };
+        paintTypeSelect.value = state.paintType;
+        stopTimerInterval();
+        clearState();
+        buildSwatches();
+        updateUI();
+      }
+
+      function buildSwatches() {
+        swatchRow.innerHTML = "";
+        COLORS.forEach(color => {
+          const d = document.createElement("div");
+          d.className = "swatch" + (state.color.toLowerCase() === color.hex.toLowerCase() ? " active" : "");
+          d.style.backgroundColor = color.hex;
+          d.title = color.name;
+          d.addEventListener("click", () => {
+            state.color = color.hex;
+            saveState();
+            document.querySelectorAll(".swatch").forEach(el => {
+              el.classList.toggle("active", el === d);
+            });
+            updateUI();
+          });
+          swatchRow.appendChild(d);
+        });
+      }
+
+      // Event wiring
+      paintTypeSelect.addEventListener("change", function (e) {
+        const newType = e.target.value;
+        state.paintType = PAINT_TYPES[newType] ? newType : "latex";
+        state.duration = getPaintTypeDef().duration;
+        saveState();
+        updateUI();
+      });
+
+      startBtn.addEventListener("click", function () {
+        if (!state.startTime || state.completed) {
+          // No session yet, or finished coat: start a fresh run
+          startTimer(true);
+        } else {
+          // Already drying; this button just refreshes + saves (no pause complexity)
+          saveState();
+          updateUI();
+        }
+      });
+
+      resetBtn.addEventListener("click", function () {
+        resetAll();
+      });
+
+      // Initialize
+      loadState();
+      if (!PAINT_TYPES[state.paintType]) {
+        state.paintType = "latex";
+      }
+      state.duration = getPaintTypeDef().duration;
+
+      // If saved color isn't in presets, keep it but no swatch will be "active" until user picks one
+      buildSwatches();
+
+      paintTypeSelect.value = state.paintType;
+
+      if (state.startTime) {
+        const progress = computeProgress();
+        if (progress >= 1) {
+          state.completed = true;
+          stopTimerInterval();
+          updateUI(); // show as fully dry, timer stopped at max
+        } else {
+          startTimer(false); // resume in-progress drying with offline time accounted for
+        }
+      } else {
+        updateUI();
+      }
+
+      window.addEventListener("beforeunload", saveState);
+    })();
   </script>
-  <script src="https://hcaptcha.com/1/api.js?onload=initCaptcha&render=explicit" async defer></script>
 </body>
 </html>
